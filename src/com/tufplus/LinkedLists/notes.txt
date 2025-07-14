@@ -1,0 +1,8 @@
+1. if you want to find midpoint of LL, we can use slow and fast pointers such that once
+fast pointer reaches end, slow ptr will point to mid element
+
+2. if you want to remove node from last, then we need to traverse the fast pointer those
+times first and then start moving both pointers simultaneously one after other. once fast
+pointer reaches the last element you can see that slow ptr has to be updated.
+
+3. add 1 to the current number in LL. 123 -> 124. can be done by reversing and by backtracking

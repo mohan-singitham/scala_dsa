@@ -1,0 +1,127 @@
+// 1. Add these dependencies to your build.sbt
+// libraryDependencies ++= Seq(
+//   "com.typesafe.slick" %% "slick" % "3.4.1",
+//   "com.typesafe.slick" %% "slick-hikaricp" % "3.4.1", // For connection pooling
+//   "com.h2database" % "h2" % "2.2.220" // Or your preferred database driver
+// )
+
+// 2. Define your DataModel (as you already have)
+package Design.FlightInventory
+
+object DataModel {
+  case class Flight(id: Long, name: String, airlineName: String, isPremiumFlight: Boolean, isActive: Boolean = true)
+  // ... other case classes
+}
+
+// 3. Define the Slick table mapping for Flight
+package Design.FlightInventory
+
+import slick.jdbc.H2Profile.api._ // Or PostgresProfile, MySQLProfile etc.
+import Design.FlightInventory.DataModel.Flight
+
+class Flights(tag: Tag) extends Table[Flight](tag, "FLIGHTS") {
+  def id = column[Long]("ID", O.PrimaryKey, O.AutoInc)
+  def name = column[String]("NAME")
+  def airlineName = column[String]("AIRLINE_NAME")
+  def isPremiumFlight = column[Boolean]("IS_PREMIUM_FLIGHT")
+  def isActive = column[Boolean]("IS_ACTIVE")
+
+  def * = (id, name, airlineName, isPremiumFlight, isActive) <> (Flight.tupled, Flight.unapply)
+}
+
+// Data Access Object (DAO) for Flights
+class FlightDAO(db: Database) {
+  val flights = TableQuery[Flights]
+
+  // Create the table schema
+  def createTable: DBIO[Unit] = flights.schema.create
+
+  // Insert a new flight
+  def insert(flight: Flight): DBIO[Long] =
+    (flights returning flights.map(_.id)) += flight
+
+  // Get flights by airline name
+  def getByAirline(airline: String): DBIO[Seq[Flight]] =
+    flights.filter(_.airlineName === airline).result
+
+  // Get all flights
+  def getAll: DBIO[Seq[Flight]] =
+    flights.result
+}
+
+// 4. Modify your FlightService to use the DAO
+package Design.FlightInventory
+
+import Design.FlightInventory.DataModel.Flight
+import slick.jdbc.H2Profile.api._ // Or your database profile
+
+import scala.concurrent.{ExecutionContext, Future}
+
+class FlightService(flightDAO: FlightDAO)(implicit ec: ExecutionContext) {
+
+  def getFlightsByAirline(airline: String): Future[Seq[Flight]] = {
+    flightDAO.db.run(flightDAO.getByAirline(airline))
+  }
+
+  def insertFlight(f: Flight): Future[Long] = {
+    flightDAO.db.run(flightDAO.insert(f))
+  }
+
+  def getAllFlights: Future[Seq[Flight]] = {
+    flightDAO.db.run(flightDAO.getAll)
+  }
+}
+
+// 5. Modify your FlightInventoryService to initialize the database and services
+package Design.FlightInventory
+
+import slick.jdbc.H2Profile.api._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Await
+import scala.concurrent.duration._
+
+class FlightInventoryService extends App {
+
+  // 1. Database Configuration
+  // This configures an in-memory H2 database. For a real app, you'd use external config.
+  val db = Database.forConfig("h2mem1") // "h2mem1" needs to be defined in application.conf or similar
+
+  // 2. Initialize DAO
+  val flightDAO = new FlightDAO(db)
+
+  // 3. Create schema (run once at application start or migration)
+  println("Creating Flight table schema...")
+  Await.result(db.run(flightDAO.createTable), 2.seconds)
+  println("Schema created.")
+
+  // 4. Initialize FlightService with the DAO
+  val flightService = new FlightService(flightDAO)
+
+  // 5. Example usage:
+  println("Inserting initial flights...")
+  val newFlight1 = DataModel.Flight(0, "6E-123", "Air India", true) // ID 0 for auto-increment
+  val newFlight2 = DataModel.Flight(0, "IN-124", "SpiceJet", true)
+
+  val insertFuture1 = flightService.insertFlight(newFlight1)
+  val insertFuture2 = flightService.insertFlight(newFlight2)
+
+  Await.result(for {
+    id1 <- insertFuture1
+    id2 <- insertFuture2
+  } yield {
+    println(s"Inserted Flight 1 with ID: $id1")
+    println(s"Inserted Flight 2 with ID: $id2")
+  }, 5.seconds)
+
+
+  println("\nGetting flights by Air India:")
+  val airIndiaFlightsFuture = flightService.getFlightsByAirline("Air India")
+  Await.result(airIndiaFlightsFuture, 5.seconds).foreach(println)
+
+  println("\nGetting all flights:")
+  val allFlightsFuture = flightService.getAllFlights
+  Await.result(allFlightsFuture, 5.seconds).foreach(println)
+
+  // In a real application, you would manage database connections and close them gracefully.
+  // db.close() // Don't forget to close your database connection pool when done.
+}

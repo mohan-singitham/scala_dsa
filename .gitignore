@@ -1,0 +1,12 @@
+# Ignore class files
+*.class
+
+# Common build directories
+/out/
+/target/
+/build/
+
+# IDE files
+*.iml
+.idea/
+.vscode/
