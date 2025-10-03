@@ -6,6 +6,8 @@
  *   var right: TreeNode = _right
  * }
  */
+//https://leetcode.com/problems/same-tree/
+
 object Solution {
   def isSameTree(p: TreeNode, q: TreeNode): Boolean = {
     (p, q) match {
