@@ -3,7 +3,7 @@ class TreeNode(_value: Int = 0, _left: TreeNode = null, _right: TreeNode = null)
   var left: TreeNode = _left
   var right: TreeNode = _right
 }
-
+//https://leetcode.com/problems/binary-tree-right-side-view/
 object views {
   def rightSideView(node: TreeNode): List[Int] = {
     if (node == null) List()
