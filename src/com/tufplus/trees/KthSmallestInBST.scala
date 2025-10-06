@@ -20,7 +20,7 @@ object  KthSmallestInBST {
       }
       inOrder(node.right)
     }
-    
+
     inOrder(node)
     result
   }
